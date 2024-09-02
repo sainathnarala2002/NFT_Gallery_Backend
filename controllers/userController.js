@@ -55,7 +55,7 @@ userController.sendOtpForForgetPassword = async (req, res) => {
   const requiredField = ["email"]
   const missingFields = findMissingFields(req.body, requiredField)
   if (missingFields !== "") return res.status(400).json({ success: false, message: "Please provide following fields " + missingFields })
-  const userExist = await Users.findOne({ email })
+  const userExist = await User.findOne({ email })
 
   if (!userExist) {
     return res.status(422).json({ success: "false", error: "User not found" })
@@ -64,7 +64,7 @@ userController.sendOtpForForgetPassword = async (req, res) => {
     //generate otp
     const otp = generateOtp()
     // make subject and data for email
-    const subject = 'OTP For User Verification - Blings Movies';
+    const subject = 'OTP For User Verification - NFT Gallery';
     const html = `<p>please use the following One Time Password (OTP):<p><h3>${otp}</h3><p>OTP's are secret. Therefore, do not disclose this to anyone.</p>`;
     // send email
     const emailSend = await sendMail(email, subject, html)
@@ -143,7 +143,7 @@ userController.forgotPassword = async (req, res) => {
   if (missingFields !== "") return res.status(400).json({ success: false, message: "Please provide following fields " + missingFields })
   try {
     const hashPassword = await bcrypt.hash(newPassword, 12)
-    const updateResponse = await Users.updateOne({ email: email }, { password: hashPassword });
+    const updateResponse = await User.updateOne({ email: email }, { password: hashPassword });
     if (updateResponse.modifiedCount > 0) {
       return res.status(200).json({ sucess: true, message: "Password updated successfully" })
     } else {

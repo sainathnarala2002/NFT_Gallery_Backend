@@ -10,6 +10,7 @@ const router = express.Router();
 router.post("/sendOtp", userController.sendOtpToEmail) // sheet
 router.post("/verifyEmail", userController.verifyEmail) // sheet
 router.post("/sendOtpForForgetPassword", userController.sendOtpForForgetPassword) // sheet
+router.post("/ChangePassword", userController.forgotPassword) // sheet
 
 // Register
 router.post("/login", userController.loginUser) // sheet
