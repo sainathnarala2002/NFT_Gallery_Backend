@@ -19,5 +19,7 @@ router.get("/logout", userController.logout) // sheet
 
 // User
 router.get("/getUser", authenticate, userController.getUser) // sheet
+router.put("/updateMyProfile", userController.updateUserMyProfile) // sheet
+
 
 module.exports = router;

@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
   emailVerified: { type: Boolean, default: true },
   mobileNumber: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  token: { type: String }
 }, { timestamps: true });
 
 const User = mongoose.model('User', UserSchema);

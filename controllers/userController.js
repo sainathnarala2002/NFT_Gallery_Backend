@@ -167,52 +167,6 @@ userController.getUserList = async (req, res) => {
   }
 }
 
-userController.getUser = async (req, res) => {
-  const { user_id } = req.query
-  try {
-    const user = await Users.aggregate([
-      {
-        "$match": { user_id: user_id }
-      },
-      {
-        "$lookup": {
-          from: "usersubscriptions",
-          localField: "user_id",
-          foreignField: "user_id",
-          as: "subscriptions"
-        }
-      },
-      {
-        "$project": {
-          "user_id": 1,
-          "username": 1,
-          "email": 1,
-          "mobile_no": 1,
-          "status": 1,
-          "planId": 1,
-          "playlist": 1,
-          "token": 1,
-          "subscriptions.purchasedMovies": 1,
-          "subscriptions.purchasedWebSeries": 1,
-          "subscriptions.current_plan_id": 1,
-          "subscriptions.start_date": 1,
-          "subscriptions.expiry_date": 1,
-          "subscriptions.history": 1
-        }
-      }
-    ])
-    if (user) {
-      return res.status(200).json({ success: true, message: "User data", data: user })
-    } else {
-      return res.status(404).json({ success: false, message: "User not found", data: user })
-    }
-  } catch (error) {
-    console.log(error)
-    return res.status(500).json({ error: "Internal Server Error", errMessage: error, success: false })
-  }
-}
-
-
 userController.updateEmail = async (req, res) => {
   const { user_id, email } = req.body
   const requiredField = ["email", "user_id"]
@@ -231,26 +185,53 @@ userController.updateEmail = async (req, res) => {
   }
 }
 
-userController.updateMyProfile = async (req, res) => {
-  const { userName, email } = req.body
-  const requiredField = ["email", "userName"]
-  const missingFields = findMissingFields(req.body, requiredField)
-  if (missingFields !== "") return res.status(400).json({ success: false, message: "Please provide following fields " + missingFields })
-  try {
-    let update = { email: email }
-    if (userName) {
-      update['userName'] = userName
-    }
-    console.log(update);
-    Users.updateOne({ email: email }, { update }).then(data => {
-      return res.status(200).json({ msg: "Updated Succesfully", success: true })
-    }, err => {
-      return res.status(500).json({ err: err, success: false })
-    })
+userController.updateUserMyProfile = async (req, res) => {
+  // Extract token from Authorization header
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(403).json({ success: false, message: 'Token is required for authentication' });
+  }
 
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    // Verify the token using jwt.verify
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find the user by ID from the decoded token
+    const user = await User.findOne({ _id: decoded.user.id });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Update user details
+    const updatedData = req.body; // Assuming the data to update is in the request body
+    const updatedUser = await User.findByIdAndUpdate(user._id, updatedData, { new: true });
+
+    // Respond with updated user data
+    return res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      data: {
+        user_id: updatedUser._id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        middleName: updatedUser.middleName,
+        lastName: updatedUser.lastName,
+        dob: updatedUser.dob,
+        mobileNumber: updatedUser.mobileNumber,
+        status: updatedUser.status,
+        token: updatedUser.token, // Optional
+      },
+    });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ error: "Internal Server Error", errMessage: error, success: false })
+    console.error('Error updating user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message,
+    });
   }
 }
 
@@ -373,6 +354,10 @@ userController.loginUser = async (req, res) => {
       expiresIn: '1h',
     });
 
+    // Save the token in the user model
+    user.token = token;
+    await user.save();
+
     res.json({ token });
 
   } catch (error) {
@@ -399,48 +384,65 @@ userController.logout = async (req, res) => {
 }
 
 userController.getUser = async (req, res) => {
-  const { user_id } = req.query
   try {
-    const user = await Users.aggregate([
-      {
-        "$match": { user_id: user_id }
-      },
-      {
-        "$lookup": {
-          from: "usersubscriptions",
-          localField: "user_id",
-          foreignField: "user_id",
-          as: "subscriptions"
-        }
-      },
-      {
-        "$project": {
-          "user_id": 1,
-          "username": 1,
-          "email": 1,
-          "mobile_no": 1,
-          "status": 1,
-          "planId": 1,
-          "playlist": 1,
-          "token": 1,
-          "subscriptions.purchasedMovies": 1,
-          "subscriptions.purchasedWebSeries": 1,
-          "subscriptions.current_plan_id": 1,
-          "subscriptions.start_date": 1,
-          "subscriptions.expiry_date": 1,
-          "subscriptions.history": 1
-        }
-      }
-    ])
-    if (user) {
-      return res.status(200).json({ success: true, message: "User data", data: user })
-    } else {
-      return res.status(404).json({ success: false, message: "User not found", data: user })
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    // Check if the Authorization header exists and is properly formatted
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(403).json({ success: false, message: 'Token is required for authentication' });
     }
+
+    const token = authHeader.split(' ')[1];
+    console.log("Token received:", token);
+
+    // Verify the token using jwt.verify
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("DECode=>",decoded);
+
+    // Find the user by ID from the decoded token
+    const user = await User.findOne({ _id: decoded.user.id });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Respond with user data
+    return res.status(200).json({
+      success: true,
+      message: 'User data retrieved successfully',
+      data: {
+        user_id: user._id,
+        firstName: user.firstName,
+        middleName: user.middleName,
+        lastName: user.lastName,
+        dob: user.dob,
+        email: user.email,
+        mobileNumber: user.mobileNumber,
+        status: user.status,
+        // token: user.token, // Optional, only include if necessary
+      },
+    });
   } catch (error) {
-    console.log(error)
-    return res.status(500).json({ error: "Internal Server Error", errMessage: error, success: false })
+    console.error("Error in getUser:", error.message);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token',
+      });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired',
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message,
+    });
   }
-}
+};
 
 module.exports = userController;
